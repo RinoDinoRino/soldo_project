@@ -164,6 +164,9 @@ Resources:
         S3Bucket: !Ref RESULTBUCKET1
         S3Key: ValidateGenerateConvert.zip
       Description: validates info, generates qoute, convert file
+      Environment:
+        Variables:
+          resultBucket: !Ref RESULTBUCKET
       FunctionName: autopolocy-validate-convert
       Handler: autopolocy-validate-convert.lambda_handler
       Role: !GetAtt AUTOPOLICYROLE.Arn

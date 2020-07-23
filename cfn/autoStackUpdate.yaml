@@ -151,9 +151,6 @@ Resources:
         S3Bucket: !Ref RESULTBUCKET1
         S3Key: VINApiCall.zip
       Description: Calls the vin API
-      Environment:
-        Variables:
-          resultBucket: !Ref RESULTBUCKET
       FunctionName: autopolicy-apiCall
       Handler: autopolicy-APICall.lambda_handler
       Role: !GetAtt AUTOPOLICYROLE.Arn
@@ -167,28 +164,31 @@ Resources:
         S3Bucket: !Ref RESULTBUCKET1
         S3Key: ValidateGenerateConvert.zip
       Description: validates info, generates qoute, convert file
+      Environment:
+        Variables:
+          resultBucket: !Ref RESULTBUCKET
       FunctionName: autopolocy-validate-convert
       Handler: autopolocy-validate-convert.lambda_handler
       Role: !GetAtt AUTOPOLICYROLE.Arn
       Timeout: 120
       Runtime: python3.7
 
-  S3CLOUDTRAIL: #TODO MIGHT BE BETTER TO DO IN UPDATE!!!!
-    Type: AWS::CloudTrail::Trail
-    Properties:
-      # CloudWatchLogsLogGroupArn: String
-      # CloudWatchLogsRoleArn: !GetAtt S3CLOUDWATCH.Arn
-      EventSelectors:
-        - DataResources:
-            - Type: AWS::S3::PutObject
-              Values: !Join
-              - ''
-              - - '!Ref RESULTBUCKET'
-                - '/input'
-          ReadWriteType: WriteOnly
-      IsLogging: true
-      S3BucketName: !Ref RESULTBUCKET
-      TrailName: S3inputTrigger
+  # S3CLOUDTRAIL: #TODO MIGHT BE BETTER TO DO IN UPDATE!!!!
+  #   Type: AWS::CloudTrail::Trail
+  #   Properties:
+  #     # CloudWatchLogsLogGroupArn: String
+  #     # CloudWatchLogsRoleArn: !GetAtt S3CLOUDWATCH.Arn
+  #     EventSelectors:
+  #       - DataResources:
+  #           - Type: AWS::S3::PutObject
+  #             Values: !Join
+  #             - ''
+  #             - - '!Ref RESULTBUCKET'
+  #               - '/input'
+  #         ReadWriteType: WriteOnly
+  #     IsLogging: true
+  #     S3BucketName: !Ref RESULTBUCKET
+  #     TrailName: S3inputTrigger
 
   S3CLOUDWATCH:
     Type: AWS::Events::Rule
