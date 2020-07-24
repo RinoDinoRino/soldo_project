@@ -3,9 +3,17 @@ Description: CloudFormation template for creating autpolicy reading.
 Parameters:
   EmailSubscriber:
     Type: String
-    Description: SNS Email subscriber
+    Description: Required!!! - SNS Email subscriber
+  LogFilePrefix:
+    Description: 'Optional - The log file prefix.'
+    Type: String
+    Default: ''
+
+Conditions:
+  HasLogFilePrefix: !Not [!Equals [!Ref LogFilePrefix, '']]
+
 Resources:
-  AUTOPOLICYROLE:
+  AUTOPOLROLE:
     Type: 'AWS::IAM::Role'
     Properties:
       Description: IAM Role
@@ -22,7 +30,7 @@ Resources:
                 - states.amazonaws.com
             Action:
               - 'sts:AssumeRole'
-      RoleName: quoteGeneratorRole
+      RoleName: quoteGenRole
       ManagedPolicyArns:
         - 'arn:aws:iam::aws:policy/AmazonS3FullAccess'
         - 'arn:aws:iam::aws:policy/AmazonSQSFullAccess'
@@ -32,6 +40,7 @@ Resources:
         - 'arn:aws:iam::aws:policy/AWSStepFunctionsFullAccess'
         - 'arn:aws:iam::aws:policy/CloudWatchFullAccess'
         - 'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+
   VINAPIDOWNQUEUE:
     Type: 'AWS::SQS::Queue'
     Properties:
@@ -63,9 +72,34 @@ Resources:
         - Endpoint: !Ref EmailSubscriber
           Protocol: email
       TopicName: validSNS
+  TRAILBUCKET:
+    Type: 'AWS::S3::Bucket'
+    Properties: {}
+  TRAILBUCKETPOLICY:
+    Type: 'AWS::S3::BucketPolicy'
+    Properties:
+      Bucket: !Ref TRAILBUCKET
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Sid: AWSCloudTrailAclCheck
+          Effect: Allow
+          Principal:
+            Service: 'cloudtrail.amazonaws.com'
+          Action: 's3:GetBucketAcl'
+          Resource: !Sub 'arn:aws:s3:::${TRAILBUCKET}'
+        - Sid: AWSCloudTrailWrite
+          Effect: Allow
+          Principal:
+            Service: 'cloudtrail.amazonaws.com'
+          Action: 's3:PutObject'
+          Resource: !If [HasLogFilePrefix, !Sub 'arn:aws:s3:::${TRAILBUCKET}/${LogFilePrefix}/AWSLogs/${AWS::AccountId}/*', !Sub 'arn:aws:s3:::${TRAILBUCKET}/AWSLogs/${AWS::AccountId}/*']
+          Condition:
+            StringEquals:
+              's3:x-amz-acl': 'bucket-owner-full-control'
   RESULTBUCKET:
     Type: 'AWS::S3::Bucket'
-  RESULTBUCKET1:
+  ZIPBUCKET:
     Type: 'AWS::S3::Bucket'
   CUSTOMLAMBDA:
     Type: 'AWS::CloudFormation::CustomResource'
@@ -73,7 +107,8 @@ Resources:
       ServiceToken: !GetAtt
         - CREATELAMBDA
         - Arn
-      S3BucketName: !Ref RESULTBUCKET1
+      S3BucketName: !Ref ZIPBUCKET
+      S3ResultBucketName: !Ref RESULTBUCKET
       Urls:
         - 'https://github.com/RinoDinoRino/soldo_project/raw/master/lambdaZip/VINApiCall.zip'
         - 'https://github.com/RinoDinoRino/soldo_project/raw/master/lambdaZip/ValidateGenerateConvert.zip'
@@ -90,6 +125,7 @@ Resources:
           import cfnresponse
           from urllib.parse import urlparse
           s3 = boto3.resource('s3')
+          client = boto3.client('s3')
           def save_to_local(url):
             urlPath = urlparse(url).path
             fileName = os.path.basename(urlPath)
@@ -108,10 +144,15 @@ Resources:
             properties = event['ResourceProperties']
             urls = properties['Urls']
             bucket = properties['S3BucketName']
+            resultBucket = properties['S3ResultBucketName']
+            folders = ['input','driverResults','vehicleResults','athenaResults']
             try:
               for url in urls:
                 print(url)
                 copy_to_s3(url, bucket)
+              for folder in folders:
+                  client.put_object(Bucket=resultBucket, Key=(folder+'/'))
+
 
             except Exception as e:
               print(e)
@@ -123,10 +164,10 @@ Resources:
             responseData['Data'] = "Success"
             cfnresponse.send(event, context, cfnresponse.SUCCESS,responseData, "CustomResourcePhysicalID")
       Description: upload lambda zips
-      FunctionName: blog-uploadzips10
+      FunctionName: autoPol-uploadZips
       Handler: index.lambda_handler
       Role: !GetAtt
-        - AUTOPOLICYROLE
+        - AUTOPOLROLE
         - Arn
       Timeout: 180
       Runtime: python3.7
@@ -135,12 +176,12 @@ Resources:
     Type: 'AWS::Lambda::Function'
     Properties:
       Code:
-        S3Bucket: !Ref RESULTBUCKET1
+        S3Bucket: !Ref ZIPBUCKET
         S3Key: textractCall.zip
       Description: Calls textract
       FunctionName: autopolicy-textractcall
       Handler: autopolicy-textractcall.lambda_handler
-      Role: !GetAtt AUTOPOLICYROLE.Arn
+      Role: !GetAtt AUTOPOLROLE.Arn
       Timeout: 120
       Runtime: python3.7
 
@@ -148,12 +189,12 @@ Resources:
     Type: 'AWS::Lambda::Function'
     Properties:
       Code:
-        S3Bucket: !Ref RESULTBUCKET1
+        S3Bucket: !Ref ZIPBUCKET
         S3Key: VINApiCall.zip
       Description: Calls the vin API
       FunctionName: autopolicy-apiCall
       Handler: autopolicy-APICall.lambda_handler
-      Role: !GetAtt AUTOPOLICYROLE.Arn
+      Role: !GetAtt AUTOPOLROLE.Arn
       Timeout: 120
       Runtime: python3.7
 
@@ -161,7 +202,7 @@ Resources:
     Type: 'AWS::Lambda::Function'
     Properties:
       Code:
-        S3Bucket: !Ref RESULTBUCKET1
+        S3Bucket: !Ref ZIPBUCKET
         S3Key: ValidateGenerateConvert.zip
       Description: validates info, generates qoute, convert file
       Environment:
@@ -169,60 +210,63 @@ Resources:
           resultBucket: !Ref RESULTBUCKET
       FunctionName: autopolocy-validate-convert
       Handler: autopolocy-validate-convert.lambda_handler
-      Role: !GetAtt AUTOPOLICYROLE.Arn
+      Role: !GetAtt AUTOPOLROLE.Arn
       Timeout: 120
       Runtime: python3.7
 
-  # S3CLOUDTRAIL: #TODO MIGHT BE BETTER TO DO IN UPDATE!!!!
-  #   Type: AWS::CloudTrail::Trail
-  #   Properties:
-  #     # CloudWatchLogsLogGroupArn: String
-  #     # CloudWatchLogsRoleArn: !GetAtt S3CLOUDWATCH.Arn
-  #     EventSelectors:
-  #       - DataResources:
-  #           - Type: AWS::S3::PutObject
-  #             Values: !Join
-  #             - ''
-  #             - - '!Ref RESULTBUCKET'
-  #               - '/input'
-  #         ReadWriteType: WriteOnly
-  #     IsLogging: true
-  #     S3BucketName: !Ref RESULTBUCKET
-  #     TrailName: S3inputTrigger
+  S3CLOUDTRAIL:
+    DependsOn:
+      - TRAILBUCKET
+      - TRAILBUCKETPOLICY
+      - CREATELAMBDA
+    Type: AWS::CloudTrail::Trail
+    Properties:
+      # CloudWatchLogsLogGroupArn: String
+      # CloudWatchLogsRoleArn: !GetAtt S3CLOUDWATCH.Arn
+      EventSelectors:
+        - DataResources:
+            - Type: AWS::S3::Object
+              Values: [!Sub 'arn:aws:s3:::${RESULTBUCKET}/input']
+              # - ''
+              # - - !GetAtt RESULTBUCKET
+              #   - '/input'
+          ReadWriteType: WriteOnly
+      IsLogging: true
+      EnableLogFileValidation: true
+      S3BucketName: !Ref TRAILBUCKET
+      TrailName: S3inputTrigger
 
   S3CLOUDWATCH:
+    DependsOn:
+      - STEPFUNCTION
     Type: AWS::Events::Rule
     Properties:
       Description: "Creates an alarm for s3 puts"
-      EventPattern: |-
-        {
-            "source": [
-              "aws.s3"
-            ],
-            "detail-type": [
-              "AWS API Call via CloudTrail"
-            ],
-            "detail": {
-              "eventSource": [
-                "s3.amazonaws.com"
-              ],
-              "eventName": [
-                "PutObject"
-              ],
-              "requestParameters": {
-                "bucketName": [
-                  "autopolicy-textract-oregon"
-                ]
-              }
-            }
-          }
+      EventPattern:
+        source:
+          - aws.s3
+        detail-type:
+          - AWS API Call via CloudTrail
+        detail:
+          eventSource:
+            - s3.amazonaws.com
+          eventName:
+            - PutObject
+          requestParameters:
+            bucketName:
+              - !Ref RESULTBUCKET
       Name: S3cloudwatch
       State: "ENABLED"
+      Targets:
+        -
+          Arn: !Ref STEPFUNCTION
+          RoleArn: !GetAtt AUTOPOLROLE.Arn
+          Id: Id123
 
-  MyStateMachine:
+  STEPFUNCTION:
     Type: AWS::StepFunctions::StateMachine
     Properties:
-      StateMachineName: AutoPolicyQuoteGenerator
+      StateMachineName: AutoPolicyStepFunc
       DefinitionSubstitutions:
         TextractLambda: !GetAtt POLICYTEXTRACT.Arn
         TextractDownSqs: !Ref TEXTRACTDOWNQUEUE
@@ -392,7 +436,7 @@ Resources:
               }
             }
           }
-      RoleArn: !GetAtt AUTOPOLICYROLE.Arn
+      RoleArn: !GetAtt AUTOPOLROLE.Arn
 
 Outputs:
   LambdaFunctionTextract:
