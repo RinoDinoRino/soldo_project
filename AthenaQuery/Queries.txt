@@ -1,4 +1,4 @@
-Creating Vehicle Table:
+Part 1 : Creating Vehicle Table (EXCLUDE THIS LINE WHEN COPYING)
 
 
 CREATE EXTERNAL TABLE IF NOT EXISTS vehicledata (
@@ -44,7 +44,7 @@ WITH SERDEPROPERTIES (
          'serialization.format' = ',', 'field.delim' = ',' ) LOCATION 's3://YOUR RESULT BUCKET NAME/vehicleResults/' TBLPROPERTIES ('has_encrypted_data'='false','skip.header.line.count'='1');
 
 
-Creating Driver Table:
+Part 2: Creating Driver Table (EXCLUDE THIS LINE WHEN COPYING)
 
 
 CREATE EXTERNAL TABLE IF NOT EXISTS driverData (
