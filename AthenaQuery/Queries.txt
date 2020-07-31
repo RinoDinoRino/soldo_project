@@ -1,0 +1,75 @@
+Creating Vehicle Table:
+
+
+CREATE EXTERNAL TABLE IF NOT EXISTS vehicledata (
+         `vehicle` string,
+         `pol_numb` string,
+         `vin` string,
+         `parked_home` int,
+         `bodily_ing_lim_per_person` int,
+         `bodily_ing_lim_per_occurence` int,
+         `bodily_ing_prem` int,
+         `property_dmg_lim` int,
+         `property_dmg_prem` int,
+         `personal_inj_lim` int,
+         `personal_inj_prem` int,
+         `uninsured_lim` int,
+         `underinsured_lim` int,
+         `uninsured_underinsured_prem` int,
+         `comprehensive_deductible` int,
+         `comprehensive_prem` int,
+         `collision_lim` int,
+         `collision_prem` int,
+         `emergency_rd_service_lim` string,
+         `emergency_rd_service_prem` int,
+         `rental_lim_day` int,
+         `rental_lim_max` int,
+         `rental_prem` int,
+         `curr_veh_prem` int,
+         `year` string,
+         `make` string,
+         `model` string,
+         `series` string,
+         `trim` string,
+         `style` string,
+         `numb_doors` int,
+         `passive_restraint` int,
+         `abs` int,
+         `vin_invalid` int,
+         `vin_invalid_reason` string,
+         `gen_veh_prem` int 
+) 
+ROW FORMAT SERDE 'org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe'
+WITH SERDEPROPERTIES (
+         'serialization.format' = ',', 'field.delim' = ',' ) LOCATION 's3://YOUR RESULT BUCKET NAME/vehicleResults/' TBLPROPERTIES ('has_encrypted_data'='false','skip.header.line.count'='1');
+
+
+Creating Driver Table:
+
+
+CREATE EXTERNAL TABLE IF NOT EXISTS driverData (
+  `name` string,
+  `email` string,
+  `phone_numb` string,
+  `pol_number` string,
+  `curr_pol_prem` int,
+  `address` string,
+  `zipcode` string,
+  `pol_year` string,
+  `additional_drivers` int,
+  `multi_veh_disc` int,
+  `good_driver_disc` int,
+  `accident_free_disc` int,
+  `loss_payee` string,
+  `numb_cars_onPol` int,
+  `user_invalid` int,
+  `user_invalid_reason` string,
+  `gen_pol_prem` int,
+  `moved` int
+)
+ROW FORMAT SERDE 'org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe'
+WITH SERDEPROPERTIES (
+  'serialization.format' = ',',
+  'field.delim' = ','
+) LOCATION 's3://YOUR RESULT BUCKET NAME/driverResults/'
+TBLPROPERTIES ('has_encrypted_data'='false','skip.header.line.count'='1');
