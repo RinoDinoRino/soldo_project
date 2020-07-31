@@ -208,7 +208,7 @@ Resources:
       Environment:
         Variables:
           resultBucket: !Ref RESULTBUCKET
-      FunctionName: autopolocy-validate-convert
+      FunctionName: autopolicy-validate-convert
       Handler: lambda_function.lambda_handler
       Role: !GetAtt AUTOPOLICYROLE.Arn
       Timeout: 120
